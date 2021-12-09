@@ -11,8 +11,6 @@ output:
   pdf_document:
     toc: no
 ---
-### when making changes
-##### project2 - git add . , git commit -m "change" , git push origin main
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, eval = TRUE, fig.align = "center", warning = F, message = F,
 tidy=TRUE, tidy.opts=list(width.cutoff=60), R.options=list(max.print=100))
