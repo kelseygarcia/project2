@@ -1819,7 +1819,7 @@ probs &lt;- predict(fit, newdata = test, type = &quot;response&quot;)
 diags &lt;- rbind(diags, class_diag(probs, truth, positive = 1))
 summarize_all(diags, mean)</code></pre>
 <pre><code>##   acc sens spec ppv     f1  ba    auc
-## 1 0.7    1    0 0.7 0.8235 0.5 0.7143</code></pre>
+## 1 0.9    1    0 0.9 0.9474 0.5 0.6667</code></pre>
 <p>Once the in-sample performance was understood, a k-nearest neighbors cross validation was performed for the linear classifier. The data was tested against 10 different k values and the AUC was averaged across all 10 of those predicting runs. That AUC was found to be 0.3333 out-of-sample. This performance shows that the linear model was not very good at predicting the gender of hurricane names outside of the data it was trained on. In this linear classifying model, there are signs of overfitting because the AUC in-sample was significantly better than the AUC out-of-sample.</p>
 </div>
 <div id="non-parametric-classifier" class="section level3">
@@ -1910,7 +1910,7 @@ fit</code></pre>
 diags &lt;- rbind(diags, class_diag(probs, truth, positive = 1))
 summarize_all(diags, mean)</code></pre>
 <pre><code>##   acc   sens   spec  ppv  f1     ba    auc
-## 1 0.7 0.8571 0.3333 0.75 0.8 0.5952 0.6905</code></pre>
+## 1 0.7 0.8571 0.3333 0.75 0.8 0.5952 0.7857</code></pre>
 <p>Again, once the in-sample performance of the non-parametric classifier was understood, a k-nearest neighbors cross validation was performed for the knn classifier. The data was tested against 10 different k values and the AUC was averaged across all 10 of those predicting runs. That AUC was found to be 0.8095 out-of-sample. This performance shows that the non-parametric model was much better at predicting the gender of hurricane names based on the four numeric variables than the linear model was. There is much less of a chance of overfitting in this non-parametric classifying model which is evident from the AUC actually being higher for the out-of-sample performance than it was in-sample.</p>
 </div>
 <div id="regressionnumeric-prediction" class="section level3">
@@ -1936,7 +1936,7 @@ for (i in 1:k) {
 }
 
 mean(diags)</code></pre>
-<pre><code>## [1] 13539.86</code></pre>
+<pre><code>## [1] 60708.89</code></pre>
 <p>When applying a k-fold cross validation on that same model, the average MSE was much higher than the MSE for the linear regression model performed.</p>
 </div>
 <div id="python" class="section level3">
