@@ -11,7 +11,8 @@ output:
   pdf_document:
     toc: no
 ---
-
+### when making changes
+##### project2 - git add . , git commit -m "change" , git push origin main
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, eval = TRUE, fig.align = "center", warning = F, message = F,
 tidy=TRUE, tidy.opts=list(width.cutoff=60), R.options=list(max.print=100))
@@ -46,92 +47,241 @@ class_diag <- function(score, truth, positive, cutoff=.5){
 
 # Mining, Classification, Prediction
 
-## Name and EID here
+## Kelsey Garcia - kg29435
 
 ### Introduction 
 
-Paragraph or two introducing your datasets and variables, why they are interesting to you, etc. See instructions for more information
+The dataset used for this project contains the hurricanes that have impacted the United States since the year 1950 to today. The variables included in this dataset are as follows: "name" gives the name given to the hurricane, "year" which represents the year of landfall, "winds_mph" which represents the maximum wind speeds along the US coastline during landfall in mph, "pressure_mb" represents the atmospheric during landfall in millibars, "deaths" represents the number of deaths caused by the hurricane, "gender_name" is a binary character variable which represents the gender of the name of the hurricane, and "total_damage" represents the total property damage in 2014 USDs. 
+
+This data was particularly interesting to me because this data was first studied to determine whether or not female-gendered named hurricanes were taken less seriously by the US public and therefore resulted in higher amounts of property damage. 
 
 ```{R}
+library(readr)
+hurricanes <- read_csv("~/project2/hurricNamed.csv")
+hurricanes
+## Cleaning up
 library(tidyverse)
-# read your datasets in here, e.g., with read_csv()
-
-# if your dataset needs tidying, do so here
-
-# any other code here
+hurricanes <- hurricanes %>% select(2:5,11:13)
+hurricanes<-as.data.frame(hurricanes)
+names(hurricanes)<- c("name","year","winds_mph","pressure_mb","deaths","gender_name","total_damage")
+hurricanes$gender_num = ifelse(hurricanes$gender_name=="f",1,0)
+hurricanes
 ```
 
 ### Cluster Analysis
 
+#### PAM Clustering
+
 ```{R}
 library(cluster)
-# clustering code here
+## finding the best fitting number of clusters
+#### scaling the data
+hurricanes_dat <- hurricanes %>% select(-name,-year,-gender_name)
+sil_width<-vector()
+#### running all options for clustering
+for(i in 2:10){
+  pam_fit<-pam(hurricanes_dat,k=i)
+  sil_width[i] <- pam_fit$silinfo$avg.width
+}
+#### visualizing best clustering based on sil_width
+ggplot() + geom_line(aes(x=1:10,y=sil_width)) + scale_x_continuous(name="k",breaks=1:10)
+
+## clustering based on 3 clusters
+hurri_pam<-pam(hurricanes, k=3)
+hurri_pam
+hurricanes$cluster = hurri_pam$cluster
+hurricanes
+## silhouette width with 4 clusters
+hurri_pam$silinfo$avg.width
 ```
 
-Discussion of clustering here
-    
+#### Visualizing Clusters
+
+```{R}
+## visualizing based on only two variables
+library(cluster)
+pamclust<-hurricanes_dat %>% mutate(cluster=as.factor(hurri_pam$clustering))
+pamclust %>% ggplot(aes(winds_mph, total_damage, color=cluster)) + geom_point()
+
+## visualizing on all pairwise combinations of variables
+library(GGally)
+ggpairs(pamclust, columns=1:4,aes(color=cluster))
+```
+PAM clustering was performed to understand how the observations were best grouped based on the four variables of "winds_mph","pressure_mb","deaths", and "total_damage". In the clustering data set, the "gender_name" character variable was changed to a binary numeric variable where 0=male and 1=female for future analysis. When finding the silhouette widths of clustering the data with 2 clusters to 10 clusters the highest silhouette width (and therefore the best fit) was using 4 clusters, with a silhouette width of 0.78. However, the number of clusters used as the best clustering scenario was 3 clusters because the silhouette width was 0.77 and allowed for better interpretation in the ggpairs plot. 
+
+In visualizing the clusters, some patterns did emerge between how much total damage was done by the hurricane and the other three variables of winds_mph, pressure_mb, and deaths. The red cluster (cluster 1) represented hurricanes that did the least total damage during landfall and was associated with a range of wind speeds, higher pressure ranges, and fewer deaths. The green cluster (cluster 2) represented hurricanes that did slightly more damage than the hurricanes clustered in the first cluster. Finally, the blue cluster (cluster 3) represented the hurricanes that did the most damage. The range of wind speeds and atmospheric pressure during landfall for this cluster were highly variable but all were higher than wind speeds found for clusters 1 and 2. Two of the hurricanes in cluster 3 had approximately the same number of deaths as the two other clusters but there was one outlier that had many more deaths as a result of the hurricane.
     
 ### Dimensionality Reduction with PCA
 
 ```{R}
-# PCA code here
+## Making Principle Components
+hurricanes_dat <- data.frame(scale(hurricanes_dat))
+hurricanes_pca <- princomp(hurricanes_dat,center=T,scale=T)
+
+## Visualizing the number of PCs to keep - 3 PCs
+eigval<-hurricanes_pca$sdev^2
+varprop=round(eigval/sum(eigval),2)
+varprop
+ggplot() + geom_bar(aes(y=varprop,x=1:5),stat="identity") + xlab("") + geom_path(aes(y=varprop, x=1:5)) + 
+  geom_text(aes(x=1:5, y=varprop, label=round(varprop, 2)), vjust=1, col="white", size=5) + 
+  scale_y_continuous(breaks=seq(0, .6, .2), labels = scales::percent) + 
+  scale_x_continuous(breaks=1:10)
 ```
 
-Discussions of PCA here. 
+The principal component analysis was done to identify what trends can be seen in the variables and which variable relationships predict the variance of data best. A scree plot was made to identify how many principle components were necessary to explain at least 80% of the variance in the dataset. According to the scree plot, three PCs were needed to satisfy that criteria. However, upon looking at the loadings summary, the third PC was found to only be predicted by the binary factor which had no relationship with the other numeric variables in the data. Therefore, further PCA techniques were only analyzed for the top two principle components which accounted for 74% of the data's total variance. 
+
+```{R}
+## Interpreting PCs
+summary(hurricanes_pca, loadings=T)
+hurricanes_pca$loadings[1:5,1:2] %>% as.data.frame %>% rownames_to_column %>% ggplot()+geom_hline(aes(yintercept=0),lty=2)+geom_vline(aes(xintercept=0),lty=2)+ylab("PC2")+xlab("PC1")+geom_segment(aes(x=0,y=0,xend=Comp.1,yend=Comp.2),arrow=arrow(),col="red") +geom_label(aes(x=Comp.1*1.1,y=Comp.2*1.1,label=rowname))
+```
+
+A biplot was made to analyze the relationships of the variables in the dataset with the principle components. According to the biplot, PC1 shows that there is an opposite relationship such that when "winds_mph", "total_damage", and "deaths" are high the "pressure_mb" values are low. This shows that stronger, more damaging hurricanes have lower atmospheric pressure at landfall. PC2 shows that when "winds_mph" are high, "pressure_mb","total_damage", and "deaths" are low. This shows a somewhat contrary relationship to the PC1 variable. 
+```{R}
+## Visualizing PC scores
+hurri_pca_df<-data.frame(Name=hurricanes$name, PC1=hurricanes_pca$scores[,1],PC2=hurricanes_pca$scores[,2])
+library(factoextra)
+ggplot(hurri_pca_df,aes(PC1,PC2))+geom_point()
+```
+Finally, PC1 and PC2 were plotted against one another to show that there is seemingly a positive correlation between the two principle compoenents such that when PC1 increases, PC2 increases as well. To score high on PC1 means that the total damage is higher due to its associated hurricane variables (high winds, low atmospheric pressure, and higher number of deaths).
+
 
 ###  Linear Classifier
 
 ```{R}
-# linear classifier code here
+# linear regression model
+hurricanes %>% ggplot(aes(total_damage,gender_num)) + geom_point()+geom_smooth(method="lm",se=F)+ylim(0,1)
+
+# predicting binary gender_num variable from all of the numeric variables
+fit <- lm(gender_num ~ total_damage+winds_mph+deaths+pressure_mb, data=hurricanes)
+score<-predict(fit,type="response")
+score %>% round(3)
+score
+
+## in-sample performance
+class_diag(score,truth=hurricanes$gender_num,positive=1)
+
+## confusion matrix
+table(truth=factor(hurricanes$gender_num==1,levels=c("TRUE","FALSE")),prediction=factor(score>.5,levels=c("TRUE","FALSE"))) %>% addmargins()
 ```
+
+A linear regression model was used to classify all of the hurricanes by there binary gender variable based on the four numeric variables of "winds_mph","pressure_mb","deaths", and "total_damage." A visualization showing the linear regression model can be viewed above. The linear model was fit and scores were given to each hurricane where 1 represented a female gendered name and 0 represented a male gendered name. Scores between 0.5 and 1 represented predicted female gendered hurricane names. After performing the 'class_diag' function, the AUC was found to be 0.6552. Therefore, this model was not very good in terms of predicting the binary variable of the gendered name of a hurricane. Finally, a confusion matrix was generated which showed that a total of 31 hurricanes were inaccurately classified. In the confusion matrix, "TRUE" represents the female gendered names while "FALSE" represents the male gendered names. The specificity (TNR) of this classifier was 0.0345 while the sensitivity (TPR) was 0.967. Lastly, the accuracy of the linear classifer in predicting the binary variable of gender of hurricane name, according to the confusion matrix, was 0.6702.
 
 ```{R}
-# cross-validation of linear classifier here
-```
+# K-means cross-validation of linear classifier using all numeric variables in 'hurricanes'
+k=10
 
-Discussion here
+data<-hurricanes[sample(nrow(hurricanes)),]
+folds<-cut(seq(1:nrow(hurricanes)),breaks=k,labels=F)
+
+diags<-NULL
+
+for(i in 1:k){
+  train<-data[folds!=i,]
+  test<-data[folds==i,]
+  truth<-test$gender_num
+}
+
+fit<-lm(gender_num~total_damage+winds_mph+deaths+pressure_mb,data=train,family="binomial")
+probs<-predict(fit,newdata = test,type="response")
+
+## out-of-sample performance of classifier
+diags<-rbind(diags,class_diag(probs,truth,positive=1))
+summarize_all(diags,mean)
+```
+Once the in-sample performance was understood, a k-nearest neighbors cross validation was performed for the linear classifier. The data was tested against 10 different k values and the AUC was averaged across all 10 of those predicting runs. That AUC was found to be 0.3333 out-of-sample. This performance shows that the linear model was not very good at predicting the gender of hurricane names outside of the data it was trained on. In this linear classifying model, there are signs of overfitting because the AUC in-sample was significantly better than the AUC out-of-sample.
 
 ### Non-Parametric Classifier
 
 ```{R}
 library(caret)
-# non-parametric classifier code here
+## k-nearest neighbors model
+knn_fit<-knn3(factor(gender_num==1,levels=c("TRUE","FALSE"))~total_damage+winds_mph+deaths+pressure_mb,data=hurricanes,k=5)
+
+## predicting binary gender_num variable from all of the numeric variables in 'hurricanes'
+y_hat_knn<-predict(knn_fit,hurricanes)
+data.frame(y_hat_knn,names=hurricanes$name)%>%arrange(names)
+
+## in-sample performance of classifier
+class_diag(y_hat_knn[,1],hurricanes$gender_num,positive=1)
+
+## confusion matrix 
+table(truth=factor(hurricanes$gender_num==1,levels=c("TRUE","FALSE")),prediction=factor(y_hat_knn[,1]>.5,levels=c("TRUE","FALSE"))) %>% addmargins()
 ```
+A k-nearest neighbors model was also used to classify all of the hurricanes by there binary gender variable based on the four numeric variables of "winds_mph","pressure_mb","deaths", and "total_damage." The knn model was fit and scores for TRUE and FALSE were given for each hurricane. Scores with higher proportions in TRUE predicted female gendered hurricane names while scores with higher proportions in FALSE predicted male gendered hurricane names. After performing the 'class_diag' function, the AUC was found to be 0.7438. Therefore, this model was not very good but was better than the linear classifier in terms of predicting the binary variable of the gendered name of a hurricane. Finally, a confusion matrix was generated which showed that a total of 28 hurricanes were inaccurately classified. In the confusion matrix, "TRUE" represents the female gendered names while "FALSE" represents the male gendered names. The specificity (TNR) of this classifier was 0.3333 while the sensitivity (TPR) was 0.875. Lastly, the accuracy of the linear classifer in predicting the binary variable of gender of hurricane name, according to the confusion matrix, was 0.7021. Based on all of this, the k-nearest neighbors performed in-sample better at predicting the binary variable than the linear classifier did.
 
 ```{R}
-# cross-validation of np classifier here
-```
+# K-means cross-validation of non-parametric classifier using all numeric variables in 'hurricanes'
+k=10
 
-Discussion
+data<-hurricanes[sample(nrow(hurricanes)),]
+folds<-cut(seq(1:nrow(hurricanes)),breaks=k,labels=F)
+
+diags<-NULL
+
+for(i in 1:k){
+  train<-data[folds!=i,]
+  test<-data[folds==i,]
+  truth<-test$gender_num
+}
+fit<-knn3(gender_num~total_damage+winds_mph+deaths+pressure_mb,data=hurricanes)
+fit
+probs<-predict(fit,newdata = test)[,2]
+
+## out-of-sample performance of classifier
+diags<-rbind(diags,class_diag(probs,truth,positive=1))
+summarize_all(diags,mean)
+```
+Again, once the in-sample performance of the non-parametric classifier was understood, a k-nearest neighbors cross validation was performed for the knn classifier. The data was tested against 10 different k values and the AUC was averaged across all 10 of those predicting runs. That AUC was found to be 0.8095 out-of-sample. This performance shows that the non-parametric model was much better at predicting the gender of hurricane names based on the four numeric variables than the linear model was. There is much less of a chance of overfitting in this non-parametric classifying model which is evident from the AUC actually being higher for the out-of-sample performance than it was in-sample. 
 
 
 ### Regression/Numeric Prediction
 
 ```{R}
 # regression model code here
+fit<-lm(total_damage~.,data=hurricanes)
+yhat<-predict(fit)
+mean((hurricanes$total_damage-yhat)^2)
 ```
 
+According to the regression model using all numeric variables to predict the total domage done by a hurricane, the mean-square error was 46,778.89. This value is very high meaning that there is a high chance of error in these predictions. 
 ```{R}
 # cross-validation of regression model here
-```
+k=10
+data<-hurricanes[sample(nrow(hurricanes)),]
+folds<-cut(seq(1:nrow(hurricanes)),breaks=k,labels=F)
 
-Discussion
+diags<-NULL
+for(i in 1:k){
+  train<-data[folds!=i,]
+  test<-data[folds==i,]
+  fit<-lm(total_damage~.,data=hurricanes)
+  yhat<-predict(fit,newdata=test)
+  diags<-mean((test$total_damage-yhat)^2)
+}
+
+mean(diags)
+```
+When applying a k-fold cross validation on that same model, the average MSE was much higher than the MSE for the linear regression model performed.
 
 ### Python 
 
 ```{R}
 library(reticulate)
+use_python("/usr/bin/python3",required=F)
+conclusion1 <- "The association of gender name of hurricanes"
 ```
 
 ```{python}
-# python code here
+conclusion2="with the various numeric variables did not appear to have a significant correlation."
+print(r.conclusion1,conclusion2)
 ```
 
-Discussion
+Basically, I made two different strings where each represented half of a concluding sentence where one of the strings was made in R code, and the other was made in python code. The two strings were combined to form the entire concluding sentence by referencing the r code in python with 'r.conclusion1.'
 
 ### Concluding Remarks
 
-Include concluding remarks here, if any
+After all of this analysis of the 'hurricanes' dataset, it was found that the gender of the names of each hurricane was not correlated or predictive of the total amount of damage done when it hit land. The point of this dataset was to understand if female named hurricanes were taken less seriously prior to landfall. Based on this analysis, the gender of the name of the hurricane was not predictive of the amount of damage done or how strong the hurricane was.
 
 
 
